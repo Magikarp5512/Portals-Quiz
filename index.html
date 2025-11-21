@@ -15,6 +15,11 @@
       margin-top: 0;
       font-size: 18px;
     }
+    .timer {
+      font-size: 16px;
+      margin-bottom: 8px;
+      color: #ffeb3b;
+    }
     .question {
       font-size: 18px;
       margin-bottom: 16px;
@@ -47,73 +52,305 @@
       font-size: 14px;
       color: #8bc34a;
     }
+    .final {
+      margin-top: 16px;
+      font-size: 16px;
+      color: #ffeb3b;
+    }
   </style>
 </head>
 <body>
   <h2 id="playerTitle">Player</h2>
-  <div class="question" id="questionText">
-    <!-- CHANGE THIS TEXT TO YOUR QUESTION -->
-    Example question: Who won the big race?
-  </div>
+  <div class="timer" id="timer">Time left: --s</div>
+  <div class="question" id="questionText"></div>
   <div class="answers">
-    <!-- CHANGE THESE 4 LINES TO YOUR ANSWERS -->
-    <button id="btnA" onclick="sendAnswer('A')">A. Horse A</button>
-    <button id="btnB" onclick="sendAnswer('B')">B. Horse B</button>
-    <button id="btnC" onclick="sendAnswer('C')">C. Horse C</button>
-    <button id="btnD" onclick="sendAnswer('D')">D. Horse D</button>
+    <button id="btnA" onclick="sendAnswer('A')"></button>
+    <button id="btnB" onclick="sendAnswer('B')"></button>
+    <button id="btnC" onclick="sendAnswer('C')"></button>
+    <button id="btnD" onclick="sendAnswer('D')"></button>
   </div>
   <div class="status" id="status"></div>
+  <div class="final" id="finalResult"></div>
 
   <script>
     // 🔗 Your Google Apps Script Web App URL
-    const BACKEND_URL = "https://script.google.com/macros/s/AKfycbxvrPxrhrHrLWFdFuXG5dpIZ2wYysAVZHy5LPcSfDQ4-fB4usJcAuRbEtKhLmC3syvn3Q/exec";
+    const BACKEND_URL =
+      "https://script.google.com/macros/s/AKfycbxvrPxrhrHrLWFdFuXG5dpIZ2wYysAVZHy5LPcSfDQ4-fB4usJcAuRbEtKhLmC3syvn3Q/exec";
 
-    // Default quiz + question + player
-    let QUIZ_ID = "Q1"; // You can change this if you want multiple quizzes
-    let QUESTION_ID = "1"; // This question's ID in your Google Sheet
+    // 🔢 All questions (IDs must match your Google Sheet question_id)
+    const QUESTIONS = [
+      {
+        id: 1,
+        text: "In a standard horse race, what does the word “furlong” refer to?",
+        A: "The starting gate",
+        B: "A unit of distance on the track",
+        C: "The horse’s saddle",
+        D: "The last corner before the finish"
+      },
+      {
+        id: 2,
+        text: "If a horse “wins by a nose”, what does that mean?",
+        A: "The horse started first from the gate",
+        B: "The horse won by a very small margin",
+        C: "The horse led from start to finish easily",
+        D: "The race was declared a dead heat"
+      },
+      {
+        id: 3,
+        text: "What is a “photo finish” in horse racing?",
+        A: "A race where fans can’t take pictures",
+        B: "A race that is cancelled due to bad light",
+        C: "A finish so close it’s decided using a camera image",
+        D: "A race only for horses with sponsor logos"
+      },
+      {
+        id: 4,
+        text: "In many racecards, what does the letter “J” usually stand for next to a name?",
+        A: "Jockey",
+        B: "Judge",
+        C: "Junior horse",
+        D: "Jackpot race"
+      },
+      {
+        id: 5,
+        text: "A “long shot” in betting is usually a horse that…",
+        A: "Has never raced before",
+        B: "Has very low odds and is expected to win",
+        C: "Has high odds and is not expected to win",
+        D: "Always starts from the inside rail"
+      },
+      {
+        id: 6,
+        text: "On a typical race display, what do the “odds” tell you?",
+        A: "How fast the horse can run in km/h",
+        B: "How many laps the race will have",
+        C: "The probability / payout ratio if that horse wins",
+        D: "The maximum number of spectators allowed"
+      },
+      {
+        id: 7,
+        text: "In a virtual racing game that pays prizes in tokens, what’s the MAIN reason to use blockchain for results?",
+        A: "To make races slower",
+        B: "To record transparent, tamper-resistant outcomes",
+        C: "To hide all results from players",
+        D: "To ensure only one person can ever watch the race"
+      },
+      {
+        id: 8,
+        text: "What is typically shown on a “race replay” screen?",
+        A: "A live view of the crowd only",
+        B: "A slow-motion video of the race that just happened",
+        C: "Training sessions from last week",
+        D: "Only the final photo at the finish line"
+      },
+      {
+        id: 9,
+        text: "If a horse is described as a “front-runner”, what is it most likely to do?",
+        A: "Stay at the back and sprint late",
+        B: "Run in the middle of the pack and never lead",
+        C: "Try to lead the race from the start",
+        D: "Refuse to leave the starting gate"
+      },
+      {
+        id: 10,
+        text: "Why might a digital racing platform limit how long players have to answer a quiz question?",
+        A: "To make sure players can search the internet calmly",
+        B: "To add pressure and reward faster knowledge",
+        C: "To reduce the number of players in the room",
+        D: "To make the graphics load faster"
+      }
+    ];
+
+    // Default quiz + player
+    let QUIZ_ID = "Q1";
     let PLAYER_ID = "Player1";
 
-    // Read ?player=... ?quiz=... ?q=... from URL (optional)
     const params = new URLSearchParams(window.location.search);
     if (params.get("player")) PLAYER_ID = params.get("player");
     if (params.get("quiz")) QUIZ_ID = params.get("quiz");
-    if (params.get("q")) QUESTION_ID = params.get("q");
 
     document.getElementById("playerTitle").textContent = "Player: " + PLAYER_ID;
 
+    // Starting question index (optional ?q= in URL)
+    let currentIndex = 0;
+    if (params.get("q")) {
+      const qId = Number(params.get("q"));
+      const idx = QUESTIONS.findIndex(q => q.id === qId);
+      if (idx >= 0) currentIndex = idx;
+    }
+
+    // Timer
+    const TIMER_SECONDS = 15;
+    let timeLeft = TIMER_SECONDS;
     let submitted = false;
+    let startTime = Date.now();
+    let timerInterval = null;
 
-    function sendAnswer(letter) {
-      if (submitted) return;
-      submitted = true;
+    const timerEl = document.getElementById("timer");
+    const questionEl = document.getElementById("questionText");
+    const statusEl = document.getElementById("status");
+    const finalEl = document.getElementById("finalResult");
 
-      document.getElementById("status").textContent = "Submitting your answer...";
+    function renderQuestion() {
+      const q = QUESTIONS[currentIndex];
+      if (!q) {
+        questionEl.textContent = "No more questions.";
+        ["btnA","btnB","btnC","btnD"].forEach(id => {
+          const btn = document.getElementById(id);
+          if (btn) btn.style.display = "none";
+        });
+        timerEl.textContent = "";
+        return;
+      }
 
-      ["btnA", "btnB", "btnC", "btnD"].forEach(id => {
+      questionEl.textContent = "Q" + q.id + ". " + q.text;
+      document.getElementById("btnA").textContent = "A. " + q.A;
+      document.getElementById("btnB").textContent = "B. " + q.B;
+      document.getElementById("btnC").textContent = "C. " + q.C;
+      document.getElementById("btnD").textContent = "D. " + q.D;
+
+      submitted = false;
+      timeLeft = TIMER_SECONDS;
+      startTime = Date.now();
+      statusEl.textContent = "";
+      finalEl.textContent = "";
+      ["btnA","btnB","btnC","btnD"].forEach(id => {
+        const btn = document.getElementById(id);
+        btn.disabled = false;
+        btn.style.display = "block";
+      });
+
+      if (timerInterval) clearInterval(timerInterval);
+      timerEl.textContent = "Time left: " + timeLeft + "s";
+      timerInterval = setInterval(() => {
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          timerEl.textContent = "Time is up!";
+          if (!submitted) {
+            sendTimeoutAnswer();
+          } else {
+            goToNextQuestion();
+          }
+          return;
+        }
+        timeLeft -= 1;
+        timerEl.textContent = "Time left: " + timeLeft + "s";
+      }, 1000);
+    }
+
+    function disableButtons() {
+      ["btnA","btnB","btnC","btnD"].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.disabled = true;
       });
+    }
+
+    function currentQuestionId() {
+      const q = QUESTIONS[currentIndex];
+      return q ? q.id : "";
+    }
+
+    function sendTimeoutAnswer() {
+      submitted = true;
+      disableButtons();
+      statusEl.textContent = "Time up – no answer (0 points).";
+
+      const elapsedMs = Date.now() - startTime;
+      const qId = currentQuestionId();
+      if (!qId) return;
 
       const url =
         BACKEND_URL +
         "?mode=answer" +
         "&quiz=" + encodeURIComponent(QUIZ_ID) +
-        "&q=" + encodeURIComponent(QUESTION_ID) +
+        "&q=" + encodeURIComponent(qId) +
         "&player=" + encodeURIComponent(PLAYER_ID) +
-        "&a=" + encodeURIComponent(letter);
+        "&a=" + encodeURIComponent("NO_ANSWER") +
+        "&t=" + encodeURIComponent(elapsedMs);
 
-      // We don't really care about the response body,
-      // we just want to fire the request.
+      fetch(url).catch(() => {}).finally(() => {
+        goToNextQuestion();
+      });
+    }
+
+    function sendAnswer(letter) {
+      if (submitted) return;
+      submitted = true;
+
+      const elapsedMs = Date.now() - startTime;
+      const qId = currentQuestionId();
+      if (!qId) return;
+
+      disableButtons();
+      statusEl.textContent = "Submitting your answer...";
+
+      const url =
+        BACKEND_URL +
+        "?mode=answer" +
+        "&quiz=" + encodeURIComponent(QUIZ_ID) +
+        "&q=" + encodeURIComponent(qId) +
+        "&player=" + encodeURIComponent(PLAYER_ID) +
+        "&a=" + encodeURIComponent(letter) +
+        "&t=" + encodeURIComponent(elapsedMs);
+
       fetch(url)
         .then(() => {
-          document.getElementById("status").textContent = "Answer submitted!";
+          statusEl.textContent = "Answer submitted!";
         })
         .catch(() => {
-          // Even if there's a CORS issue, the request normally still sends.
-          document.getElementById("status").textContent =
-            "Answer sent (if you see any issue, tell the host).";
+          statusEl.textContent =
+            "Answer sent (if anything looks wrong, tell the host).";
         });
     }
+
+    function goToNextQuestion() {
+      if (currentIndex < QUESTIONS.length - 1) {
+        currentIndex += 1;
+        renderQuestion();
+      } else {
+        endQuiz();
+      }
+    }
+
+    function endQuiz() {
+      questionEl.textContent = "Quiz finished!";
+      timerEl.textContent = "";
+      ["btnA","btnB","btnC","btnD"].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.style.display = "none";
+      });
+
+      // Fetch player result from backend
+      const url =
+        BACKEND_URL +
+        "?mode=playerResult" +
+        "&quiz=" + encodeURIComponent(QUIZ_ID) +
+        "&player=" + encodeURIComponent(PLAYER_ID);
+
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if (data && !data.error) {
+            const timeSec = (data.time_ms / 1000).toFixed(1);
+            let text = `Your total score: ${data.score} points in ${timeSec}s.`;
+            if (data.rank != null) {
+              text += ` You are #${data.rank}.`;
+            }
+            if (data.isWinner) {
+              text += " 🏆 You are the winner!";
+            }
+            finalEl.textContent = text;
+          } else {
+            finalEl.textContent = "Quiz finished. Waiting for host to announce results.";
+          }
+        })
+        .catch(() => {
+          finalEl.textContent = "Quiz finished. Waiting for host to announce results.";
+        });
+    }
+
+    // Start on load
+    renderQuestion();
   </script>
 </body>
 </html>
