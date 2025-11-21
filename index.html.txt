@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Portals Quiz</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #111;
+      color: #fff;
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+    .question {
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+    .answers {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    button {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      background: #333;
+      color: #fff;
+      text-align: left;
+    }
+    button:hover {
+      background: #444;
+    }
+    button:disabled {
+      background: #222;
+      color: #888;
+      cursor: default;
+    }
+    .status {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #8bc34a;
+    }
+  </style>
+</head>
+<body>
+  <h2 id="playerTitle">Player</h2>
+  <div class="question" id="questionText">
+    <!-- CHANGE THIS TEXT TO YOUR QUESTION -->
+    Example question: Who won the big race?
+  </div>
+  <div class="answers">
+    <!-- CHANGE THESE 4 LINES TO YOUR ANSWERS -->
+    <button id="btnA" onclick="sendAnswer('A')">A. Horse A</button>
+    <button id="btnB" onclick="sendAnswer('B')">B. Horse B</button>
+    <button id="btnC" onclick="sendAnswer('C')">C. Horse C</button>
+    <button id="btnD" onclick="sendAnswer('D')">D. Horse D</button>
+  </div>
+  <div class="status" id="status"></div>
+
+  <script>
+    // 🔗 Your Google Apps Script Web App URL
+    const BACKEND_URL = "https://script.google.com/macros/s/AKfycbxvrPxrhrHrLWFdFuXG5dpIZ2wYysAVZHy5LPcSfDQ4-fB4usJcAuRbEtKhLmC3syvn3Q/exec";
+
+    // Default quiz + question + player
+    let QUIZ_ID = "Q1"; // You can change this if you want multiple quizzes
+    let QUESTION_ID = "1"; // This question's ID in your Google Sheet
+    let PLAYER_ID = "Player1";
+
+    // Read ?player=... ?quiz=... ?q=... from URL (optional)
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("player")) PLAYER_ID = params.get("player");
+    if (params.get("quiz")) QUIZ_ID = params.get("quiz");
+    if (params.get("q")) QUESTION_ID = params.get("q");
+
+    document.getElementById("playerTitle").textContent = "Player: " + PLAYER_ID;
+
+    let submitted = false;
+
+    function sendAnswer(letter) {
+      if (submitted) return;
+      submitted = true;
+
+      document.getElementById("status").textContent = "Submitting your answer...";
+
+      ["btnA", "btnB", "btnC", "btnD"].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = true;
+      });
+
+      const url =
+        BACKEND_URL +
+        "?mode=answer" +
+        "&quiz=" + encodeURIComponent(QUIZ_ID) +
+        "&q=" + encodeURIComponent(QUESTION_ID) +
+        "&player=" + encodeURIComponent(PLAYER_ID) +
+        "&a=" + encodeURIComponent(letter);
+
+      // We don't really care about the response body,
+      // we just want to fire the request.
+      fetch(url)
+        .then(() => {
+          document.getElementById("status").textContent = "Answer submitted!";
+        })
+        .catch(() => {
+          // Even if there's a CORS issue, the request normally still sends.
+          document.getElementById("status").textContent =
+            "Answer sent (if you see any issue, tell the host).";
+        });
+    }
+  </script>
+</body>
+</html>
