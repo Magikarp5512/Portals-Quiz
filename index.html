@@ -169,6 +169,15 @@
     if (params.get("player")) PLAYER_ID = params.get("player");
     if (params.get("quiz")) QUIZ_ID = params.get("quiz");
 
+    // If no player was provided in the URL, ask the user for their Portals username
+if (!params.get("player")) {
+  const entered = prompt(
+    "Enter your Portals username (exactly as it appears above your character):"
+  );
+  if (entered) {
+    PLAYER_ID = entered.trim();
+  }
+}
     document.getElementById("playerTitle").textContent = "Player: " + PLAYER_ID;
 
     // Starting question index (optional ?q= in URL)
@@ -354,3 +363,4 @@
   </script>
 </body>
 </html>
+
