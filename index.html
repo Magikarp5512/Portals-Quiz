@@ -77,6 +77,10 @@
     const BACKEND_URL =
       "https://script.google.com/macros/s/AKfycbxvrPxrhrHrLWFdFuXG5dpIZ2wYysAVZHy5LPcSfDQ4-fB4usJcAuRbEtKhLmC3syvn3Q/exec";
 
+    // ⏱ Settings
+    const PRE_START_SECONDS = 20; // pre-quiz countdown
+    const TIMER_SECONDS = 10; // per-question timer
+
     // 🔢 All questions (IDs must match your Google Sheet question_id)
     const QUESTIONS = [
       {
@@ -169,15 +173,16 @@
     if (params.get("player")) PLAYER_ID = params.get("player");
     if (params.get("quiz")) QUIZ_ID = params.get("quiz");
 
-    // If no player was provided in the URL, ask the user for their Portals username
-if (!params.get("player")) {
-  const entered = prompt(
-    "Enter your Portals username (exactly as it appears above your character):"
-  );
-  if (entered) {
-    PLAYER_ID = entered.trim();
-  }
-}
+    // Ask for Portals username if not provided in URL
+    if (!params.get("player")) {
+      const entered = prompt(
+        "Enter your Portals username (exactly as it appears above your character):"
+      );
+      if (entered) {
+        PLAYER_ID = entered.trim();
+      }
+    }
+
     document.getElementById("playerTitle").textContent = "Player: " + PLAYER_ID;
 
     // Starting question index (optional ?q= in URL)
@@ -188,8 +193,7 @@ if (!params.get("player")) {
       if (idx >= 0) currentIndex = idx;
     }
 
-    // Timer
-    const TIMER_SECONDS = 15;
+    // Timer variables
     let timeLeft = TIMER_SECONDS;
     let submitted = false;
     let startTime = Date.now();
@@ -266,7 +270,10 @@ if (!params.get("player")) {
 
       const elapsedMs = Date.now() - startTime;
       const qId = currentQuestionId();
-      if (!qId) return;
+      if (!qId) {
+        goToNextQuestion();
+        return;
+      }
 
       const url =
         BACKEND_URL +
@@ -329,7 +336,6 @@ if (!params.get("player")) {
         if (btn) btn.style.display = "none";
       });
 
-      // Fetch player result from backend
       const url =
         BACKEND_URL +
         "?mode=playerResult" +
@@ -345,22 +351,44 @@ if (!params.get("player")) {
             if (data.rank != null) {
               text += ` You are #${data.rank}.`;
             }
-            if (data.isWinner) {
-              text += " 🏆 You are the winner!";
+            if (data.isWinner && data.code) {
+              text += ` 🏆 You are a winner! Your access code: ${data.code}`;
+            } else if (!data.isWinner) {
+              text += ` Better luck next time!`;
             }
             finalEl.textContent = text;
           } else {
-            finalEl.textContent = "Quiz finished. Waiting for host to announce results.";
+            finalEl.textContent =
+              "Quiz finished. Waiting for host to announce results.";
           }
         })
         .catch(() => {
-          finalEl.textContent = "Quiz finished. Waiting for host to announce results.";
+          finalEl.textContent =
+            "Quiz finished. Waiting for host to announce results.";
         });
     }
 
+    // Pre-quiz countdown before first question
+    function startQuizAfterCountdown() {
+      let preLeft = PRE_START_SECONDS;
+      timerEl.textContent = "Quiz starts in: " + preLeft + "s";
+      questionEl.textContent = "Get ready for the race quiz!";
+
+      const preInterval = setInterval(() => {
+        preLeft -= 1;
+        if (preLeft <= 0) {
+          clearInterval(preInterval);
+          renderQuestion();
+        } else {
+          timerEl.textContent = "Quiz starts in: " + preLeft + "s";
+        }
+      }, 1000);
+    }
+
     // Start on load
-    renderQuestion();
+    startQuizAfterCountdown();
   </script>
 </body>
 </html>
+
 
