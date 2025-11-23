@@ -81,91 +81,7 @@
     const PRE_START_SECONDS = 20; // pre-quiz countdown
     const TIMER_SECONDS = 10; // per-question timer
 
-    // 🔢 All questions (IDs must match your Google Sheet question_id)
-    const QUESTIONS = [
-      {
-        id: 1,
-        text: "In a standard horse race, what does the word “furlong” refer to?",
-        A: "The starting gate",
-        B: "A unit of distance on the track",
-        C: "The horse’s saddle",
-        D: "The last corner before the finish"
-      },
-      {
-        id: 2,
-        text: "If a horse “wins by a nose”, what does that mean?",
-        A: "The horse started first from the gate",
-        B: "The horse won by a very small margin",
-        C: "The horse led from start to finish easily",
-        D: "The race was declared a dead heat"
-      },
-      {
-        id: 3,
-        text: "What is a “photo finish” in horse racing?",
-        A: "A race where fans can’t take pictures",
-        B: "A race that is cancelled due to bad light",
-        C: "A finish so close it’s decided using a camera image",
-        D: "A race only for horses with sponsor logos"
-      },
-      {
-        id: 4,
-        text: "In many racecards, what does the letter “J” usually stand for next to a name?",
-        A: "Jockey",
-        B: "Judge",
-        C: "Junior horse",
-        D: "Jackpot race"
-      },
-      {
-        id: 5,
-        text: "A “long shot” in betting is usually a horse that…",
-        A: "Has never raced before",
-        B: "Has very low odds and is expected to win",
-        C: "Has high odds and is not expected to win",
-        D: "Always starts from the inside rail"
-      },
-      {
-        id: 6,
-        text: "On a typical race display, what do the “odds” tell you?",
-        A: "How fast the horse can run in km/h",
-        B: "How many laps the race will have",
-        C: "The probability / payout ratio if that horse wins",
-        D: "The maximum number of spectators allowed"
-      },
-      {
-        id: 7,
-        text: "In a virtual racing game that pays prizes in tokens, what’s the MAIN reason to use blockchain for results?",
-        A: "To make races slower",
-        B: "To record transparent, tamper-resistant outcomes",
-        C: "To hide all results from players",
-        D: "To ensure only one person can ever watch the race"
-      },
-      {
-        id: 8,
-        text: "What is typically shown on a “race replay” screen?",
-        A: "A live view of the crowd only",
-        B: "A slow-motion video of the race that just happened",
-        C: "Training sessions from last week",
-        D: "Only the final photo at the finish line"
-      },
-      {
-        id: 9,
-        text: "If a horse is described as a “front-runner”, what is it most likely to do?",
-        A: "Stay at the back and sprint late",
-        B: "Run in the middle of the pack and never lead",
-        C: "Try to lead the race from the start",
-        D: "Refuse to leave the starting gate"
-      },
-      {
-        id: 10,
-        text: "Why might a digital racing platform limit how long players have to answer a quiz question?",
-        A: "To make sure players can search the internet calmly",
-        B: "To add pressure and reward faster knowledge",
-        C: "To reduce the number of players in the room",
-        D: "To make the graphics load faster"
-      }
-    ];
-
-    // Default quiz + player
+    // quiz + player
     let QUIZ_ID = "Q1";
     let PLAYER_ID = "Player1";
 
@@ -185,13 +101,9 @@
 
     document.getElementById("playerTitle").textContent = "Player: " + PLAYER_ID;
 
-    // Starting question index (optional ?q= in URL)
+    // QUESTIONS will be loaded from backend
+    let QUESTIONS = [];
     let currentIndex = 0;
-    if (params.get("q")) {
-      const qId = Number(params.get("q"));
-      const idx = QUESTIONS.findIndex(q => q.id === qId);
-      if (idx >= 0) currentIndex = idx;
-    }
 
     // Timer variables
     let timeLeft = TIMER_SECONDS;
@@ -204,8 +116,17 @@
     const statusEl = document.getElementById("status");
     const finalEl = document.getElementById("finalResult");
 
+    function currentQuestion() {
+      return QUESTIONS[currentIndex] || null;
+    }
+
+    function currentQuestionId() {
+      const q = currentQuestion();
+      return q ? q.id : "";
+    }
+
     function renderQuestion() {
-      const q = QUESTIONS[currentIndex];
+      const q = currentQuestion();
       if (!q) {
         questionEl.textContent = "No more questions.";
         ["btnA","btnB","btnC","btnD"].forEach(id => {
@@ -256,11 +177,6 @@
         const btn = document.getElementById(id);
         if (btn) btn.disabled = true;
       });
-    }
-
-    function currentQuestionId() {
-      const q = QUESTIONS[currentIndex];
-      return q ? q.id : "";
     }
 
     function sendTimeoutAnswer() {
@@ -372,7 +288,7 @@
     function startQuizAfterCountdown() {
       let preLeft = PRE_START_SECONDS;
       timerEl.textContent = "Quiz starts in: " + preLeft + "s";
-      questionEl.textContent = "Get ready for the race quiz!";
+      questionEl.textContent = "Getting questions ready...";
 
       const preInterval = setInterval(() => {
         preLeft -= 1;
@@ -385,10 +301,39 @@
       }, 1000);
     }
 
+    // Fetch questions from backend, then start countdown
+    function loadQuiz() {
+      timerEl.textContent = "Loading quiz...";
+      questionEl.textContent = "Contacting quiz server...";
+
+      const url =
+        BACKEND_URL +
+        "?mode=getQuiz" +
+        "&quiz=" + encodeURIComponent(QUIZ_ID);
+
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if (!data || !data.questions || !data.questions.length) {
+            questionEl.textContent = "No questions available.";
+            timerEl.textContent = "";
+            return;
+          }
+          QUESTIONS = data.questions;
+          currentIndex = 0;
+          startQuizAfterCountdown();
+        })
+        .catch(() => {
+          questionEl.textContent = "Error loading quiz. Tell the host.";
+          timerEl.textContent = "";
+        });
+    }
+
     // Start on load
-    startQuizAfterCountdown();
+    loadQuiz();
   </script>
 </body>
 </html>
+
 
 
