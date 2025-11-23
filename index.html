@@ -1,84 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Portals Quiz</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 16px;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #111;
-      color: #fff;
-    }
-    h2 {
-      margin-top: 0;
-      font-size: 18px;
-    }
-    .timer {
-      font-size: 16px;
-      margin-bottom: 8px;
-      color: #ffeb3b;
-    }
-    .question {
-      font-size: 18px;
-      margin-bottom: 16px;
-    }
-    .answers {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    button {
-      padding: 10px 14px;
-      border: none;
-      border-radius: 6px;
-      font-size: 16px;
-      cursor: pointer;
-      background: #333;
-      color: #fff;
-      text-align: left;
-    }
-    button:hover {
-      background: #444;
-    }
-    button:disabled {
-      background: #222;
-      color: #888;
-      cursor: default;
-    }
-    .status {
-      margin-top: 12px;
-      font-size: 14px;
-      color: #8bc34a;
-    }
-    .final {
-      margin-top: 16px;
-      font-size: 16px;
-      color: #ffeb3b;
-    }
-  </style>
-</head>
-<body>
-  <h2 id="playerTitle">Player</h2>
-  <div class="timer" id="timer">Time left: --s</div>
-  <div class="question" id="questionText"></div>
-  <div class="answers">
-    <button id="btnA" onclick="sendAnswer('A')"></button>
-    <button id="btnB" onclick="sendAnswer('B')"></button>
-    <button id="btnC" onclick="sendAnswer('C')"></button>
-    <button id="btnD" onclick="sendAnswer('D')"></button>
-  </div>
-  <div class="status" id="status"></div>
-  <div class="final" id="finalResult"></div>
-
-  <script>
-    // 🔗 Your Google Apps Script Web App URL
-    const BACKEND_URL =
-      "https://script.google.com/macros/s/AKfycbzfVaLiI1ls5UQjhVzRzVqxxeq92r8XsP4AP3gP_pUJyq3y3f_3dc-PsJhVsOUI5OdQyQ/exec";
-
-    // ⏱ Settings
-    const PRE_START_SECONDS = 20; // pre-quiz countdown
+ const PRE_START_SECONDS = 20; // pre-quiz countdown
     const TIMER_SECONDS = 10; // per-question timer
 
     // quiz + player
@@ -334,7 +254,5 @@
   </script>
 </body>
 </html>
-
-
 
 
