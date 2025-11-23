@@ -1,258 +1,271 @@
- const PRE_START_SECONDS = 20; // pre-quiz countdown
-    const TIMER_SECONDS = 10; // per-question timer
 
-    // quiz + player
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Portals Quiz</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #111;
+      color: #fff;
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+    .timer {
+      font-size: 16px;
+      margin-bottom: 8px;
+      color: #ffeb3b;
+    }
+    .question {
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+    .answers {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    button {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      background: #333;
+      color: #fff;
+      text-align: left;
+    }
+    button:hover {
+      background: #444;
+    }
+    button:disabled {
+      background: #222;
+      color: #888;
+      cursor: default;
+    }
+    .status {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #8bc34a;
+    }
+    .final {
+      margin-top: 16px;
+      font-size: 16px;
+      color: #ffeb3b;
+    }
+  </style>
+</head>
+<body>
+  <h2 id="playerTitle">Player</h2>
+  <div class="timer" id="timer">Time left: --s</div>
+  <div class="question" id="questionText"></div>
+
+  <div class="answers">
+    <button id="btnA" onclick="sendAnswer('A')"></button>
+    <button id="btnB" onclick="sendAnswer('B')"></button>
+    <button id="btnC" onclick="sendAnswer('C')"></button>
+    <button id="btnD" onclick="sendAnswer('D')"></button>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="final" id="finalResult"></div>
+
+  <script>
+    // GOOGLE SCRIPT BACKEND URL
+    const BACKEND_URL =
+      "https://script.google.com/macros/s/AKfycbzfVaLiI1ls5UQjhVzRzVqxxeq92r8XsP4AP3gP_pUJyq3y3f_3dc-PsJhVsOUI5OdQyQ/exec";
+
+    // QUIZ SETTINGS
+    const PRE_START_SECONDS = 5;
+    const TIMER_SECONDS = 10;
+
     let QUIZ_ID = "Q1";
-    let PLAYER_ID = "Player1";
+    let PLAYER_ID = "Player";
+    let QUESTIONS = [];
+    let currentIndex = 0;
+    let timer = null;
+    let timeLeft = TIMER_SECONDS;
+    let startTime = 0;
+    let answering = false;
 
+    // Read URL parameters
     const params = new URLSearchParams(window.location.search);
     if (params.get("player")) PLAYER_ID = params.get("player");
     if (params.get("quiz")) QUIZ_ID = params.get("quiz");
 
-    // Ask for Portals username if not provided in URL
-    if (!params.get("player")) {
-      const entered = prompt(
-        "Enter your Portals username (exactly as it appears above your character):"
-      );
-      if (entered) {
-        PLAYER_ID = entered.trim();
-      }
-    }
-
     document.getElementById("playerTitle").textContent = "Player: " + PLAYER_ID;
 
-    // QUESTIONS will be loaded from backend
-    let QUESTIONS = [];
-    let currentIndex = 0;
+    // Load quiz from backend
+    async function loadQuiz() {
+      document.getElementById("status").textContent = "Loading quiz...";
 
-    // Timer variables
-    let timeLeft = TIMER_SECONDS;
-    let submitted = false;
-    let startTime = Date.now();
-    let timerInterval = null;
+      try {
+        const res = await fetch(
+          BACKEND_URL + "?mode=getQuiz&quiz=" + encodeURIComponent(QUIZ_ID)
+        );
 
-    const timerEl = document.getElementById("timer");
-    const questionEl = document.getElementById("questionText");
-    const statusEl = document.getElementById("status");
-    const finalEl = document.getElementById("finalResult");
+        const data = await res.json();
 
-    function currentQuestion() {
-      return QUESTIONS[currentIndex] || null;
-    }
+        if (!data.questions || data.questions.length === 0) {
+          document.getElementById("status").textContent =
+            "Error: No questions received.";
+          return;
+        }
 
-    function currentQuestionId() {
-      const q = currentQuestion();
-      return q ? q.id : "";
-    }
+        QUESTIONS = data.questions;
+        document.getElementById("status").textContent =
+          "Quiz loaded! Starting soon...";
 
-    function renderQuestion() {
-      const q = currentQuestion();
-      if (!q) {
-        questionEl.textContent = "No more questions.";
-        ["btnA","btnB","btnC","btnD"].forEach(id => {
-          const btn = document.getElementById(id);
-          if (btn) btn.style.display = "none";
-        });
-        timerEl.textContent = "";
-        return;
+        startPreCountdown();
+      } catch (err) {
+        document.getElementById("status").textContent =
+          "Error loading quiz. Tell the host.";
       }
+    }
 
-      questionEl.textContent = "Q" + q.id + ". " + q.text;
+    // PRE-COUTDOWN
+    function startPreCountdown() {
+      let pre = PRE_START_SECONDS;
+      const timerEl = document.getElementById("timer");
+      timerEl.textContent = "Quiz starts in: " + pre + "s";
+
+      const interval = setInterval(() => {
+        pre--;
+        timerEl.textContent = "Quiz starts in: " + pre + "s";
+
+        if (pre <= 0) {
+          clearInterval(interval);
+          startQuestion();
+        }
+      }, 1000);
+    }
+
+    // SHOW QUESTION
+    function startQuestion() {
+      answering = true;
+      timeLeft = TIMER_SECONDS;
+
+      const q = QUESTIONS[currentIndex];
+      document.getElementById("questionText").textContent =
+        q.id + ". " + q.text;
+
       document.getElementById("btnA").textContent = "A. " + q.A;
       document.getElementById("btnB").textContent = "B. " + q.B;
       document.getElementById("btnC").textContent = "C. " + q.C;
       document.getElementById("btnD").textContent = "D. " + q.D;
 
-      submitted = false;
-      timeLeft = TIMER_SECONDS;
-      startTime = Date.now();
-      statusEl.textContent = "";
-      finalEl.textContent = "";
-      ["btnA","btnB","btnC","btnD"].forEach(id => {
-        const btn = document.getElementById(id);
-        btn.disabled = false;
-        btn.style.display = "block";
-      });
+      enableButtons();
 
-      if (timerInterval) clearInterval(timerInterval);
+      startTime = Date.now();
+      updateTimer();
+    }
+
+    // TIMER
+    function updateTimer() {
+      const timerEl = document.getElementById("timer");
       timerEl.textContent = "Time left: " + timeLeft + "s";
-      timerInterval = setInterval(() => {
-        if (timeLeft <= 0) {
-          clearInterval(timerInterval);
-          timerEl.textContent = "Time is up!";
-          if (!submitted) {
-            sendTimeoutAnswer();
-          } else {
-            goToNextQuestion();
-          }
-          return;
-        }
-        timeLeft -= 1;
+
+      timer = setInterval(() => {
+        timeLeft--;
         timerEl.textContent = "Time left: " + timeLeft + "s";
+
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          answering = false;
+          disableButtons();
+          sendAnswer("NO_ANSWER");
+        }
       }, 1000);
     }
 
     function disableButtons() {
-      ["btnA","btnB","btnC","btnD"].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.disabled = true;
+      ["btnA", "btnB", "btnC", "btnD"].forEach((id) => {
+        document.getElementById(id).disabled = true;
+      });
+    }
+    function enableButtons() {
+      ["btnA", "btnB", "btnC", "btnD"].forEach((id) => {
+        document.getElementById(id).disabled = false;
       });
     }
 
-    function sendTimeoutAnswer() {
-      submitted = true;
+    // SEND ANSWER
+    async function sendAnswer(letter) {
+      if (!answering) return;
+      answering = false;
+      clearInterval(timer);
       disableButtons();
-      statusEl.textContent = "Time up – no answer (0 points).";
 
-      const elapsedMs = Date.now() - startTime;
-      const qId = currentQuestionId();
-      if (!qId) {
-        goToNextQuestion();
-        return;
-      }
+      const elapsed = Date.now() - startTime;
 
-      const url =
-        BACKEND_URL +
-        "?mode=answer" +
-        "&quiz=" + encodeURIComponent(QUIZ_ID) +
-        "&q=" + encodeURIComponent(qId) +
-        "&player=" + encodeURIComponent(PLAYER_ID) +
-        "&a=" + encodeURIComponent("NO_ANSWER") +
-        "&t=" + encodeURIComponent(elapsedMs);
+      document.getElementById("status").textContent = "Submitting...";
 
-      fetch(url).catch(() => {}).finally(() => {
-        goToNextQuestion();
-      });
-    }
+      try {
+        await fetch(
+          BACKEND_URL +
+            "?mode=answer" +
+            "&quiz=" +
+            QUIZ_ID +
+            "&q=" +
+            QUESTIONS[currentIndex].id +
+            "&player=" +
+            encodeURIComponent(PLAYER_ID) +
+            "&a=" +
+            letter +
+            "&t=" +
+            elapsed
+        );
+      } catch (e) {}
 
-    function sendAnswer(letter) {
-      if (submitted) return;
-      submitted = true;
+      document.getElementById("status").textContent = "Answer submitted!";
 
-      const elapsedMs = Date.now() - startTime;
-      const qId = currentQuestionId();
-      if (!qId) return;
-
-      disableButtons();
-      statusEl.textContent = "Submitting your answer...";
-
-      const url =
-        BACKEND_URL +
-        "?mode=answer" +
-        "&quiz=" + encodeURIComponent(QUIZ_ID) +
-        "&q=" + encodeURIComponent(qId) +
-        "&player=" + encodeURIComponent(PLAYER_ID) +
-        "&a=" + encodeURIComponent(letter) +
-        "&t=" + encodeURIComponent(elapsedMs);
-
-      fetch(url)
-        .then(() => {
-          statusEl.textContent = "Answer submitted!";
-        })
-        .catch(() => {
-          statusEl.textContent =
-            "Answer sent (if anything looks wrong, tell the host).";
-        });
-    }
-
-    function goToNextQuestion() {
-      if (currentIndex < QUESTIONS.length - 1) {
-        currentIndex += 1;
-        renderQuestion();
-      } else {
-        endQuiz();
-      }
-    }
-
-    function endQuiz() {
-      questionEl.textContent = "Quiz finished!";
-      timerEl.textContent = "";
-      ["btnA","btnB","btnC","btnD"].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.style.display = "none";
-      });
-
-      const url =
-        BACKEND_URL +
-        "?mode=playerResult" +
-        "&quiz=" + encodeURIComponent(QUIZ_ID) +
-        "&player=" + encodeURIComponent(PLAYER_ID);
-
-      fetch(url)
-        .then(res => res.json())
-        .then(data => {
-          if (data && !data.error) {
-            const timeSec = (data.time_ms / 1000).toFixed(1);
-            let text = `Your total score: ${data.score} points in ${timeSec}s.`;
-            if (data.rank != null) {
-              text += ` You are #${data.rank}.`;
-            }
-            if (data.isWinner && data.code) {
-              text += ` 🏆 You are a winner! Your access code: ${data.code}`;
-            } else if (!data.isWinner) {
-              text += ` Better luck next time!`;
-            }
-            finalEl.textContent = text;
-          } else {
-            finalEl.textContent =
-              "Quiz finished. Waiting for host to announce results.";
-          }
-        })
-        .catch(() => {
-          finalEl.textContent =
-            "Quiz finished. Waiting for host to announce results.";
-        });
-    }
-
-    // Pre-quiz countdown before first question
-    function startQuizAfterCountdown() {
-      let preLeft = PRE_START_SECONDS;
-      timerEl.textContent = "Quiz starts in: " + preLeft + "s";
-      questionEl.textContent = "Getting questions ready...";
-
-      const preInterval = setInterval(() => {
-        preLeft -= 1;
-        if (preLeft <= 0) {
-          clearInterval(preInterval);
-          renderQuestion();
+      // NEXT QUESTION
+      setTimeout(() => {
+        currentIndex++;
+        if (currentIndex >= QUESTIONS.length) {
+          showFinal();
         } else {
-          timerEl.textContent = "Quiz starts in: " + preLeft + "s";
+          startQuestion();
         }
-      }, 1000);
+      }, 800);
     }
 
-    // Fetch questions from backend, then start countdown
-    function loadQuiz() {
-      timerEl.textContent = "Loading quiz...";
-      questionEl.textContent = "Contacting quiz server...";
+    // SHOW FINAL MESSAGE
+    async function showFinal() {
+      document.getElementById("questionText").textContent = "Quiz finished!";
+      document.getElementById("timer").textContent = "";
 
-      const url =
+      // Fetch player result
+      const res = await fetch(
         BACKEND_URL +
-        "?mode=getQuiz" +
-        "&quiz=" + encodeURIComponent(QUIZ_ID);
+          "?mode=playerResult&quiz=" +
+          QUIZ_ID +
+          "&player=" +
+          encodeURIComponent(PLAYER_ID)
+      );
+      const data = await res.json();
 
-      fetch(url)
-        .then(res => res.json())
-        .then(data => {
-          if (!data || !data.questions || !data.questions.length) {
-            questionEl.textContent = "No questions available.";
-            timerEl.textContent = "";
-            return;
-          }
-          QUESTIONS = data.questions;
-          currentIndex = 0;
-          startQuizAfterCountdown();
-        })
-        .catch(() => {
-          questionEl.textContent = "Error loading quiz. Tell the host.";
-          timerEl.textContent = "";
-        });
+      let txt =
+        "Final score: " +
+        data.score +
+        " points<br>Rank: " +
+        data.rank +
+        "<br>";
+
+      if (data.isWinner && data.code) {
+        txt += "<br><b>WINNER! Your access code:</b><br>" + data.code;
+      }
+
+      document.getElementById("finalResult").innerHTML = txt;
     }
 
-    // Start on load
+    // START EVERYTHING
     loadQuiz();
   </script>
 </body>
 </html>
-
-
