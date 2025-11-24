@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -64,24 +63,19 @@
   <h2 id="playerTitle">Player</h2>
   <div class="timer" id="timer">Time left: --s</div>
   <div class="question" id="questionText"></div>
-
   <div class="answers">
     <button id="btnA" onclick="sendAnswer('A')"></button>
     <button id="btnB" onclick="sendAnswer('B')"></button>
     <button id="btnC" onclick="sendAnswer('C')"></button>
     <button id="btnD" onclick="sendAnswer('D')"></button>
   </div>
-
   <div class="status" id="status"></div>
   <div class="final" id="finalResult"></div>
 
   <script>
-    // GOOGLE SCRIPT BACKEND URL
-    const BACKEND_URL =
-      "https://script.google.com/macros/s/AKfycbzfVaLiI1ls5UQjhVzRzVqxxeq92r8XsP4AP3gP_pUJyq3y3f_3dc-PsJhVsOUI5OdQyQ/exec";
+    const BACKEND_URL = "https://script.google.com/macros/s/AKfycbx_B7NUbWpvECO37nMiUIoHSppvJxO1S3JAo2rvgpkMkvCSYiI0f-oOgI-eg6AZHN3Emw/exec";
 
-    // QUIZ SETTINGS
-    const PRE_START_SECONDS = 5;
+    const PRE_START_SECONDS = 20;
     const TIMER_SECONDS = 10;
 
     let QUIZ_ID = "Q1";
@@ -93,42 +87,34 @@
     let startTime = 0;
     let answering = false;
 
-    // Read URL parameters
     const params = new URLSearchParams(window.location.search);
     if (params.get("player")) PLAYER_ID = params.get("player");
     if (params.get("quiz")) QUIZ_ID = params.get("quiz");
 
     document.getElementById("playerTitle").textContent = "Player: " + PLAYER_ID;
 
-    // Load quiz from backend
     async function loadQuiz() {
       document.getElementById("status").textContent = "Loading quiz...";
-
       try {
         const res = await fetch(
           BACKEND_URL + "?mode=getQuiz&quiz=" + encodeURIComponent(QUIZ_ID)
         );
-
         const data = await res.json();
-
         if (!data.questions || data.questions.length === 0) {
           document.getElementById("status").textContent =
-            "Error: No questions received.";
+            "Error: no questions received.";
           return;
         }
-
         QUESTIONS = data.questions;
         document.getElementById("status").textContent =
-          "Quiz loaded! Starting soon...";
-
+          "Quiz loaded. Starting soon...";
         startPreCountdown();
-      } catch (err) {
+      } catch (e) {
         document.getElementById("status").textContent =
           "Error loading quiz. Tell the host.";
       }
     }
 
-    // PRE-COUTDOWN
     function startPreCountdown() {
       let pre = PRE_START_SECONDS;
       const timerEl = document.getElementById("timer");
@@ -137,7 +123,6 @@
       const interval = setInterval(() => {
         pre--;
         timerEl.textContent = "Quiz starts in: " + pre + "s";
-
         if (pre <= 0) {
           clearInterval(interval);
           startQuestion();
@@ -145,7 +130,6 @@
       }, 1000);
     }
 
-    // SHOW QUESTION
     function startQuestion() {
       answering = true;
       timeLeft = TIMER_SECONDS;
@@ -165,7 +149,6 @@
       updateTimer();
     }
 
-    // TIMER
     function updateTimer() {
       const timerEl = document.getElementById("timer");
       timerEl.textContent = "Time left: " + timeLeft + "s";
@@ -173,7 +156,6 @@
       timer = setInterval(() => {
         timeLeft--;
         timerEl.textContent = "Time left: " + timeLeft + "s";
-
         if (timeLeft <= 0) {
           clearInterval(timer);
           answering = false;
@@ -184,17 +166,16 @@
     }
 
     function disableButtons() {
-      ["btnA", "btnB", "btnC", "btnD"].forEach((id) => {
+      ["btnA", "btnB", "btnC", "btnD"].forEach(id => {
         document.getElementById(id).disabled = true;
       });
     }
     function enableButtons() {
-      ["btnA", "btnB", "btnC", "btnD"].forEach((id) => {
+      ["btnA", "btnB", "btnC", "btnD"].forEach(id => {
         document.getElementById(id).disabled = false;
       });
     }
 
-    // SEND ANSWER
     async function sendAnswer(letter) {
       if (!answering) return;
       answering = false;
@@ -202,6 +183,7 @@
       disableButtons();
 
       const elapsed = Date.now() - startTime;
+      const q = QUESTIONS[currentIndex];
 
       document.getElementById("status").textContent = "Submitting...";
 
@@ -209,22 +191,16 @@
         await fetch(
           BACKEND_URL +
             "?mode=answer" +
-            "&quiz=" +
-            QUIZ_ID +
-            "&q=" +
-            QUESTIONS[currentIndex].id +
-            "&player=" +
-            encodeURIComponent(PLAYER_ID) +
-            "&a=" +
-            letter +
-            "&t=" +
-            elapsed
+            "&quiz=" + encodeURIComponent(QUIZ_ID) +
+            "&q=" + encodeURIComponent(q.id) +
+            "&player=" + encodeURIComponent(PLAYER_ID) +
+            "&a=" + encodeURIComponent(letter) +
+            "&t=" + encodeURIComponent(elapsed)
         );
       } catch (e) {}
 
       document.getElementById("status").textContent = "Answer submitted!";
 
-      // NEXT QUESTION
       setTimeout(() => {
         currentIndex++;
         if (currentIndex >= QUESTIONS.length) {
@@ -235,37 +211,33 @@
       }, 800);
     }
 
-    // SHOW FINAL MESSAGE
     async function showFinal() {
       document.getElementById("questionText").textContent = "Quiz finished!";
       document.getElementById("timer").textContent = "";
+      disableButtons();
 
-      // Fetch player result
-      const res = await fetch(
-        BACKEND_URL +
-          "?mode=playerResult&quiz=" +
-          QUIZ_ID +
-          "&player=" +
-          encodeURIComponent(PLAYER_ID)
-      );
-      const data = await res.json();
-
-      let txt =
-        "Final score: " +
-        data.score +
-        " points<br>Rank: " +
-        data.rank +
-        "<br>";
-
-      if (data.isWinner && data.code) {
-        txt += "<br><b>WINNER! Your access code:</b><br>" + data.code;
+      try {
+        const res = await fetch(
+          BACKEND_URL +
+            "?mode=playerResult" +
+            "&quiz=" + encodeURIComponent(QUIZ_ID) +
+            "&player=" + encodeURIComponent(PLAYER_ID)
+        );
+        const data = await res.json();
+        let txt =
+          "Final score: " + data.score + " points. Rank: " + data.rank;
+        if (data.isWinner && data.code) {
+          txt += " | WINNER! Access code: " + data.code;
+        }
+        document.getElementById("finalResult").textContent = txt;
+      } catch (e) {
+        document.getElementById("finalResult").textContent =
+          "Quiz finished. Ask the host for results.";
       }
-
-      document.getElementById("finalResult").innerHTML = txt;
     }
 
-    // START EVERYTHING
     loadQuiz();
   </script>
 </body>
 </html>
+
