@@ -1,463 +1,865 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
   <meta charset="UTF-8" />
+
   <title>Portals Quiz</title>
+
   <style>
+
     body {
+
       margin: 0;
+
       padding: 16px;
+
       font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
       background: #111;
+
       color: #fff;
+
     }
+
     h2 {
+
       margin-top: 0;
+
       font-size: 18px;
+
     }
+
     .timer {
+
       font-size: 16px;
+
       margin-bottom: 8px;
+
       color: #ffeb3b;
+
     }
+
     .question {
+
       font-size: 18px;
+
       margin-bottom: 16px;
+
     }
+
     .answers {
+
       display: flex;
+
       flex-direction: column;
+
       gap: 8px;
+
     }
+
     button {
+
       padding: 10px 14px;
+
       border: none;
+
       border-radius: 6px;
+
       font-size: 16px;
+
       cursor: pointer;
+
       background: #333;
+
       color: #fff;
+
       text-align: left;
+
     }
+
     button:hover {
+
       background: #444;
+
     }
+
     button:disabled {
+
       background: #222;
+
       color: #888;
+
       cursor: default;
+
     }
+
     .status {
+
       margin-top: 12px;
+
       font-size: 14px;
+
       color: #8bc34a;
+
     }
+
     .final {
+
       margin-top: 16px;
+
       font-size: 16px;
+
       color: #ffeb3b;
+
     }
+
+
 
     /* Username overlay */
+
     .overlay {
+
       position: fixed;
+
       inset: 0;
+
       background: rgba(0, 0, 0, 0.9);
+
       display: flex;
+
       align-items: center;
+
       justify-content: center;
+
       z-index: 9999;
+
     }
+
     .overlay-card {
+
       background: #222;
+
       padding: 20px;
+
       border-radius: 10px;
+
       max-width: 320px;
+
       width: 100%;
+
       box-shadow: 0 0 10px rgba(0,0,0,0.6);
+
     }
+
     .overlay-card h3 {
+
       margin-top: 0;
+
       margin-bottom: 8px;
+
       font-size: 18px;
+
     }
+
     .overlay-card p {
+
       margin-top: 0;
+
       margin-bottom: 12px;
+
       font-size: 14px;
+
       color: #ccc;
+
     }
+
     .overlay-card input {
+
       width: 100%;
+
       padding: 8px 10px;
+
       margin-bottom: 10px;
+
       border-radius: 6px;
+
       border: 1px solid #444;
+
       background: #111;
+
       color: #fff;
+
       font-size: 14px;
+
     }
+
     .overlay-card button {
+
       width: 100%;
+
       padding: 10px 14px;
+
       border-radius: 6px;
+
       border: none;
+
       background: #4caf50;
+
       color: #fff;
+
       font-size: 15px;
+
       cursor: pointer;
+
     }
+
     .overlay-card button:hover {
+
       background: #45a047;
+
     }
+
     .overlay-error {
+
       color: #ff5252;
+
       font-size: 13px;
+
       min-height: 16px;
+
       margin-bottom: 4px;
+
     }
+
   </style>
+
 </head>
+
 <body>
+
   <!-- Username overlay -->
+
   <div id="usernameOverlay" class="overlay" style="display:none;">
+
     <div class="overlay-card">
+
       <h3>Enter your username</h3>
+
       <p>Please type your Portals username (exactly as it appears above your character).</p>
+
       <div class="overlay-error" id="usernameError"></div>
+
       <input type="text" id="usernameInput" placeholder="Your username" />
+
       <button id="usernameSubmit">Start</button>
+
     </div>
+
   </div>
+
+
 
   <h2 id="playerTitle">Player</h2>
+
   <div class="timer" id="timer">Time left: --s</div>
+
   <div class="question" id="questionText"></div>
+
   <div class="answers">
+
     <button id="btnA" onclick="sendAnswer('A')"></button>
+
     <button id="btnB" onclick="sendAnswer('B')"></button>
+
     <button id="btnC" onclick="sendAnswer('C')"></button>
+
     <button id="btnD" onclick="sendAnswer('D')"></button>
+
   </div>
+
   <div class="status" id="status"></div>
+
   <div class="final" id="finalResult"></div>
 
+
+
   <script>
+
     // 🔗 Your Apps Script Web App URL (already working)
+
     const BACKEND_URL =
-      "https://script.google.com/macros/s/AKfycbw4sA5Ya95FMWyVs0kXl28HpX0txMQGNUFnWoCE5tTYQ1NOspfSX-rQVuXCC2ulFUWLuw/exec";
+
+      "https://script.google.com/macros/s/AKfycbxJoP_wyAcHY4eBYQ0XXZSMFaA80Jeny19W6O6ZjJdf8XRRmNZyjQv0K_MOZcgrMbQdBg/exec";
+
+
 
     const QUESTION_TIME_SECONDS = 10;
 
+
+
     let QUIZ_ID = "Q1";
+
     let PLAYER_ID = null;
+
     let QUESTIONS = [];
+
     let currentIndex = 0;
 
+
+
     let answering = false;
+
     let timeLeft = QUESTION_TIME_SECONDS;
+
     let timerInterval = null;
+
     let questionStartTime = 0;
 
+
+
     let START_AT_MS = null;
+
     let WAIT_POLL = null;
 
+
+
     const params = new URLSearchParams(window.location.search);
+
     if (params.get("quiz")) QUIZ_ID = params.get("quiz");
 
+
+
     // If ?player= is provided in URL, trust it and skip overlay
+
     const playerFromUrl = params.get("player");
+
     if (playerFromUrl) {
+
       PLAYER_ID = playerFromUrl.trim();
+
       localStorage.setItem("portals_quiz_username", PLAYER_ID);
+
     } else {
+
       // Otherwise try to load saved username
+
       const stored = localStorage.getItem("portals_quiz_username");
+
       if (stored && stored.trim() !== "") {
+
         PLAYER_ID = stored.trim();
+
       }
+
     }
+
+
 
     const playerTitleEl = document.getElementById("playerTitle");
+
     const timerEl = document.getElementById("timer");
+
     const questionEl = document.getElementById("questionText");
+
     const statusEl = document.getElementById("status");
+
     const finalEl = document.getElementById("finalResult");
 
+
+
     function updatePlayerTitle() {
+
       playerTitleEl.textContent = "Player: " + (PLAYER_ID || "Unknown");
+
     }
+
+
 
     // Show username overlay if we don't have a player id
+
     function showUsernameOverlay() {
+
       const overlay = document.getElementById("usernameOverlay");
+
       const input = document.getElementById("usernameInput");
+
       const btn = document.getElementById("usernameSubmit");
+
       const err = document.getElementById("usernameError");
 
+
+
       overlay.style.display = "flex";
+
       input.value = "";
+
       err.textContent = "";
 
+
+
       btn.onclick = () => {
+
         const val = (input.value || "").trim();
+
         if (!val) {
+
           err.textContent = "Username cannot be empty.";
+
           return;
+
         }
+
         if (val.length > 32) {
+
           err.textContent = "Username is too long.";
+
           return;
+
         }
+
         PLAYER_ID = val;
+
         localStorage.setItem("portals_quiz_username", PLAYER_ID);
+
         overlay.style.display = "none";
+
         updatePlayerTitle();
+
         loadQuiz();
+
       };
+
     }
+
+
 
     async function loadQuiz() {
+
       try {
+
         statusEl.textContent = "Loading quiz...";
+
         const res = await fetch(
+
           BACKEND_URL + "?mode=getQuiz&quiz=" + encodeURIComponent(QUIZ_ID)
+
         );
+
         const data = await res.json();
+
         QUESTIONS = data.questions || [];
+
         START_AT_MS = data.start_at_ms || null;
 
+
+
         if (!QUESTIONS.length) {
+
           questionEl.textContent = "No questions found. Tell the host.";
+
           timerEl.textContent = "";
+
           statusEl.textContent = "";
+
           return;
+
         }
+
+
 
         // host has not started yet
+
         if (!START_AT_MS) {
+
           questionEl.textContent = "Waiting for host to start the quiz...";
+
           timerEl.textContent = "";
+
           statusEl.textContent = "";
+
           disableButtons();
 
+
+
           if (!WAIT_POLL) {
+
             WAIT_POLL = setInterval(loadQuiz, 3000);
+
           }
+
           return;
+
         }
+
+
 
         // we have a start time – stop polling
+
         if (WAIT_POLL) {
+
           clearInterval(WAIT_POLL);
+
           WAIT_POLL = null;
+
         }
+
+
 
         const now = Date.now();
+
         const diffMs = START_AT_MS - now;
 
+
+
         if (diffMs > 0) {
+
           startLobbyCountdown(Math.ceil(diffMs / 1000));
+
         } else {
+
           // quiz already started, just begin immediately
+
           startQuestion();
+
         }
+
       } catch (e) {
+
         questionEl.textContent = "Error loading quiz. Tell the host.";
+
         timerEl.textContent = "";
+
         statusEl.textContent = "";
+
       }
+
     }
 
+
+
     function startLobbyCountdown(seconds) {
+
       let remaining = seconds;
+
       questionEl.textContent = "Get ready! Quiz will start soon.";
+
       statusEl.textContent = "";
+
       disableButtons();
+
       answering = false;
+
+
 
       timerEl.textContent = "Quiz starts in: " + remaining + "s";
 
+
+
       const interval = setInterval(() => {
+
         remaining--;
+
         timerEl.textContent = "Quiz starts in: " + remaining + "s";
+
         if (remaining <= 0) {
+
           clearInterval(interval);
+
           startQuestion();
+
         }
+
       }, 1000);
+
     }
+
+
 
     function startQuestion() {
+
       if (currentIndex >= QUESTIONS.length) {
-        async function showFinal() {
-  questionEl.textContent = "Quiz finished!";
-  timerEl.textContent = "";
-  disableButtons();
 
-  try {
-    const res = await fetch(
-      BACKEND_URL +
-        "?mode=playerResult" +
-        "&quiz=" + encodeURIComponent(QUIZ_ID) +
-        "&player=" + encodeURIComponent(PLAYER_ID)
-    );
-    const data = await res.json();
+        showFinal();
 
-    let txt =
-      "Final score: " + data.score + " points. Rank: " + data.rank;
-
-    if (data.isWinner && data.code) {
-      txt += " — WINNER! Access code: " + data.code;
-    }
-
-    finalEl.textContent = txt +
-      "\n\nRedirecting to leaderboard...";
-
-    // ⭐
- AUTO-REDIRECT TO LEADERBOARD AFTER 5s
-    setTimeout(() => {
-      window.location.href =
-        BACKEND_URL +
-        "?mode=leaderboard&quiz=" +
-        encodeURIComponent(QUIZ_ID);
-    }, 5000);
-
-  } catch (e) {
-    console.error(e);
-    finalEl.textContent =
-      "Quiz finished. Could not load your score. Ask the host.";
-  }
-};
         return;
+
       }
 
+
+
       const q = QUESTIONS[currentIndex];
+
       answering = true;
+
       timeLeft = QUESTION_TIME_SECONDS;
+
       questionStartTime = Date.now();
 
+
+
       questionEl.textContent = q.id + ". " + q.text;
+
       document.getElementById("btnA").textContent = "A. " + q.A;
+
       document.getElementById("btnB").textContent = "B. " + q.B;
+
       document.getElementById("btnC").textContent = "C. " + q.C;
+
       document.getElementById("btnD").textContent = "D. " + q.D;
+
       statusEl.textContent = "";
 
+
+
       enableButtons();
+
       updateQuestionTimer();
+
     }
+
+
 
     function updateQuestionTimer() {
+
       timerEl.textContent = "Time left: " + timeLeft + "s";
+
       if (timerInterval) clearInterval(timerInterval);
+
+
 
       timerInterval = setInterval(() => {
+
         timeLeft--;
+
         timerEl.textContent = "Time left: " + timeLeft + "s";
+
         if (timeLeft <= 0) {
+
           clearInterval(timerInterval);
+
           answering = false;
+
           disableButtons();
+
           sendAnswer("NO_ANSWER");
+
         }
+
       }, 1000);
+
     }
+
+
 
     function disableButtons() {
+
       ["btnA", "btnB", "btnC", "btnD"].forEach(id => {
+
         const b = document.getElementById(id);
+
         if (b) b.disabled = true;
+
       });
+
     }
+
+
 
     function enableButtons() {
+
       ["btnA", "btnB", "btnC", "btnD"].forEach(id => {
+
         const b = document.getElementById(id);
+
         if (b) b.disabled = false;
+
       });
+
     }
 
+
+
     async function sendAnswer(letter) {
+
       // allow "NO_ANSWER" even if answering=false (timeout case)
+
       if (letter !== "NO_ANSWER" && !answering) return;
 
+
+
       answering = false;
+
       disableButtons();
+
       if (timerInterval) clearInterval(timerInterval);
 
+
+
       const q = QUESTIONS[currentIndex];
+
       const elapsed = Date.now() - questionStartTime;
+
+
 
       statusEl.textContent = "Submitting...";
 
+
+
       try {
+
         await fetch(
+
           BACKEND_URL +
+
             "?mode=answer" +
+
             "&quiz=" + encodeURIComponent(QUIZ_ID) +
+
             "&q=" + encodeURIComponent(q.id) +
+
             "&player=" + encodeURIComponent(PLAYER_ID) +
+
             "&a=" + encodeURIComponent(letter) +
+
             "&t=" + encodeURIComponent(elapsed)
+
         );
+
         statusEl.textContent = "Answer submitted!";
+
       } catch (e) {
+
         statusEl.textContent =
+
           "Answer sent (if anything looks wrong, tell the host).";
+
       }
+
+
 
       setTimeout(() => {
+
         currentIndex++;
+
         if (currentIndex >= QUESTIONS.length) {
+
           showFinal();
+
         } else {
+
           startQuestion();
+
         }
+
       }, 800);
+
     }
+
+
 
     async function showFinal() {
+
       questionEl.textContent = "Quiz finished!";
+
       timerEl.textContent = "";
+
       disableButtons();
 
+
+
       try {
+
         const res = await fetch(
+
           BACKEND_URL +
+
             "?mode=playerResult" +
+
             "&quiz=" + encodeURIComponent(QUIZ_ID) +
+
             "&player=" + encodeURIComponent(PLAYER_ID)
+
         );
+
         const data = await res.json();
+
+
+
         let txt =
+
           "Final score: " + data.score + " points. Rank: " + data.rank;
+
+
+
         if (data.isWinner && data.code) {
-          txt += " | WINNER! Access code: " + data.code;
+
+          txt += " — WINNER! Access code: " + data.code;
+
         }
-        finalEl.textContent = txt;
+
+
+
+        finalEl.textContent = txt + "\n\nRedirecting to leaderboard...";
+
+
+
+        // AUTO-REDIRECT TO LEADERBOARD AFTER 5s
+
+        setTimeout(() => {
+
+          window.location.href =
+
+            BACKEND_URL +
+
+            "?mode=leaderboard&quiz=" +
+
+            encodeURIComponent(QUIZ_ID);
+
+        }, 5000);
+
+
+
       } catch (e) {
+
+        console.error(e);
+
         finalEl.textContent =
-          "Quiz finished. Ask the host for results.";
+
+          "Quiz finished. Could not load your score. Ask the host.";
+
       }
+
     }
 
+
+
     // ---------- INITIALIZATION ----------
+
     (function init() {
+
       if (!PLAYER_ID) {
+
         // show overlay and wait
+
         updatePlayerTitle();
+
         showUsernameOverlay();
+
       } else {
+
         updatePlayerTitle();
+
         loadQuiz();
+
       }
+
     })();
+
   </script>
+
 </body>
+
 </html>
-
-
-
-
-
