@@ -290,7 +290,45 @@
 
     function startQuestion() {
       if (currentIndex >= QUESTIONS.length) {
-        showFinal();
+        async function showFinal() {
+  questionEl.textContent = "Quiz finished!";
+  timerEl.textContent = "";
+  disableButtons();
+
+  try {
+    const res = await fetch(
+      BACKEND_URL +
+        "?mode=playerResult" +
+        "&quiz=" + encodeURIComponent(QUIZ_ID) +
+        "&player=" + encodeURIComponent(PLAYER_ID)
+    );
+    const data = await res.json();
+
+    let txt =
+      "Final score: " + data.score + " points. Rank: " + data.rank;
+
+    if (data.isWinner && data.code) {
+      txt += " — WINNER! Access code: " + data.code;
+    }
+
+    finalEl.textContent = txt +
+      "\n\nRedirecting to leaderboard...";
+
+    // ⭐
+ AUTO-REDIRECT TO LEADERBOARD AFTER 5s
+    setTimeout(() => {
+      window.location.href =
+        BACKEND_URL +
+        "?mode=leaderboard&quiz=" +
+        encodeURIComponent(QUIZ_ID);
+    }, 5000);
+
+  } catch (e) {
+    console.error(e);
+    finalEl.textContent =
+      "Quiz finished. Could not load your score. Ask the host.";
+  }
+};
         return;
       }
 
@@ -418,6 +456,7 @@
   </script>
 </body>
 </html>
+
 
 
 
