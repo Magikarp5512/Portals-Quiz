@@ -57,9 +57,79 @@
       font-size: 16px;
       color: #ffeb3b;
     }
+
+    /* Username overlay */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .overlay-card {
+      background: #222;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 320px;
+      width: 100%;
+      box-shadow: 0 0 10px rgba(0,0,0,0.6);
+    }
+    .overlay-card h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+    .overlay-card p {
+      margin-top: 0;
+      margin-bottom: 12px;
+      font-size: 14px;
+      color: #ccc;
+    }
+    .overlay-card input {
+      width: 100%;
+      padding: 8px 10px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #111;
+      color: #fff;
+      font-size: 14px;
+    }
+    .overlay-card button {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: none;
+      background: #4caf50;
+      color: #fff;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .overlay-card button:hover {
+      background: #45a047;
+    }
+    .overlay-error {
+      color: #ff5252;
+      font-size: 13px;
+      min-height: 16px;
+      margin-bottom: 4px;
+    }
   </style>
 </head>
 <body>
+  <!-- Username overlay -->
+  <div id="usernameOverlay" class="overlay" style="display:none;">
+    <div class="overlay-card">
+      <h3>Enter your username</h3>
+      <p>Please type your Portals username (exactly as it appears above your character).</p>
+      <div class="overlay-error" id="usernameError"></div>
+      <input type="text" id="usernameInput" placeholder="Your username" />
+      <button id="usernameSubmit">Start</button>
+    </div>
+  </div>
+
   <h2 id="playerTitle">Player</h2>
   <div class="timer" id="timer">Time left: --s</div>
   <div class="question" id="questionText"></div>
@@ -73,57 +143,145 @@
   <div class="final" id="finalResult"></div>
 
   <script>
-    const BACKEND_URL = "https://script.google.com/macros/s/AKfycbx_B7NUbWpvECO37nMiUIoHSppvJxO1S3JAo2rvgpkMkvCSYiI0f-oOgI-eg6AZHN3Emw/exec";
+    // 🔗 Your Apps Script Web App URL (already working)
+    const BACKEND_URL =
+      "https://script.google.com/macros/s/AKfycbzfVaLiI1ls5UQjhVzRzVqxxeq92r8XsP4AP3gP_pUJyq3y3f_3dc-PsJhVsOUI5OdQyQ/exec";
 
-    const PRE_START_SECONDS = 20;
-    const TIMER_SECONDS = 10;
+    const QUESTION_TIME_SECONDS = 10;
 
     let QUIZ_ID = "Q1";
-    let PLAYER_ID = "Player";
+    let PLAYER_ID = null;
     let QUESTIONS = [];
     let currentIndex = 0;
-    let timer = null;
-    let timeLeft = TIMER_SECONDS;
-    let startTime = 0;
+
     let answering = false;
+    let timeLeft = QUESTION_TIME_SECONDS;
+    let timerInterval = null;
+    let questionStartTime = 0;
+
+    let START_AT_MS = null;
+    let WAIT_POLL = null;
 
     const params = new URLSearchParams(window.location.search);
-    if (params.get("player")) PLAYER_ID = params.get("player");
     if (params.get("quiz")) QUIZ_ID = params.get("quiz");
 
-    document.getElementById("playerTitle").textContent = "Player: " + PLAYER_ID;
+    // If ?player= is provided in URL, trust it and skip overlay
+    const playerFromUrl = params.get("player");
+    if (playerFromUrl) {
+      PLAYER_ID = playerFromUrl.trim();
+      localStorage.setItem("portals_quiz_username", PLAYER_ID);
+    } else {
+      // Otherwise try to load saved username
+      const stored = localStorage.getItem("portals_quiz_username");
+      if (stored && stored.trim() !== "") {
+        PLAYER_ID = stored.trim();
+      }
+    }
+
+    const playerTitleEl = document.getElementById("playerTitle");
+    const timerEl = document.getElementById("timer");
+    const questionEl = document.getElementById("questionText");
+    const statusEl = document.getElementById("status");
+    const finalEl = document.getElementById("finalResult");
+
+    function updatePlayerTitle() {
+      playerTitleEl.textContent = "Player: " + (PLAYER_ID || "Unknown");
+    }
+
+    // Show username overlay if we don't have a player id
+    function showUsernameOverlay() {
+      const overlay = document.getElementById("usernameOverlay");
+      const input = document.getElementById("usernameInput");
+      const btn = document.getElementById("usernameSubmit");
+      const err = document.getElementById("usernameError");
+
+      overlay.style.display = "flex";
+      input.value = "";
+      err.textContent = "";
+
+      btn.onclick = () => {
+        const val = (input.value || "").trim();
+        if (!val) {
+          err.textContent = "Username cannot be empty.";
+          return;
+        }
+        if (val.length > 32) {
+          err.textContent = "Username is too long.";
+          return;
+        }
+        PLAYER_ID = val;
+        localStorage.setItem("portals_quiz_username", PLAYER_ID);
+        overlay.style.display = "none";
+        updatePlayerTitle();
+        loadQuiz();
+      };
+    }
 
     async function loadQuiz() {
-      document.getElementById("status").textContent = "Loading quiz...";
       try {
+        statusEl.textContent = "Loading quiz...";
         const res = await fetch(
           BACKEND_URL + "?mode=getQuiz&quiz=" + encodeURIComponent(QUIZ_ID)
         );
         const data = await res.json();
-        if (!data.questions || data.questions.length === 0) {
-          document.getElementById("status").textContent =
-            "Error: no questions received.";
+        QUESTIONS = data.questions || [];
+        START_AT_MS = data.start_at_ms || null;
+
+        if (!QUESTIONS.length) {
+          questionEl.textContent = "No questions found. Tell the host.";
+          timerEl.textContent = "";
+          statusEl.textContent = "";
           return;
         }
-        QUESTIONS = data.questions;
-        document.getElementById("status").textContent =
-          "Quiz loaded. Starting soon...";
-        startPreCountdown();
+
+        // host has not started yet
+        if (!START_AT_MS) {
+          questionEl.textContent = "Waiting for host to start the quiz...";
+          timerEl.textContent = "";
+          statusEl.textContent = "";
+          disableButtons();
+
+          if (!WAIT_POLL) {
+            WAIT_POLL = setInterval(loadQuiz, 3000);
+          }
+          return;
+        }
+
+        // we have a start time – stop polling
+        if (WAIT_POLL) {
+          clearInterval(WAIT_POLL);
+          WAIT_POLL = null;
+        }
+
+        const now = Date.now();
+        const diffMs = START_AT_MS - now;
+
+        if (diffMs > 0) {
+          startLobbyCountdown(Math.ceil(diffMs / 1000));
+        } else {
+          // quiz already started, just begin immediately
+          startQuestion();
+        }
       } catch (e) {
-        document.getElementById("status").textContent =
-          "Error loading quiz. Tell the host.";
+        questionEl.textContent = "Error loading quiz. Tell the host.";
+        timerEl.textContent = "";
+        statusEl.textContent = "";
       }
     }
 
-    function startPreCountdown() {
-      let pre = PRE_START_SECONDS;
-      const timerEl = document.getElementById("timer");
-      timerEl.textContent = "Quiz starts in: " + pre + "s";
+    function startLobbyCountdown(seconds) {
+      let remaining = seconds;
+      questionEl.textContent = "Get ready! Quiz will start soon.";
+      statusEl.textContent = "";
+      disableButtons();
+      answering = false;
+
+      timerEl.textContent = "Quiz starts in: " + remaining + "s";
 
       const interval = setInterval(() => {
-        pre--;
-        timerEl.textContent = "Quiz starts in: " + pre + "s";
-        if (pre <= 0) {
+        remaining--;
+        timerEl.textContent = "Quiz starts in: " + remaining + "s";
+        if (remaining <= 0) {
           clearInterval(interval);
           startQuestion();
         }
@@ -131,33 +289,36 @@
     }
 
     function startQuestion() {
-      answering = true;
-      timeLeft = TIMER_SECONDS;
+      if (currentIndex >= QUESTIONS.length) {
+        showFinal();
+        return;
+      }
 
       const q = QUESTIONS[currentIndex];
-      document.getElementById("questionText").textContent =
-        q.id + ". " + q.text;
+      answering = true;
+      timeLeft = QUESTION_TIME_SECONDS;
+      questionStartTime = Date.now();
 
+      questionEl.textContent = q.id + ". " + q.text;
       document.getElementById("btnA").textContent = "A. " + q.A;
       document.getElementById("btnB").textContent = "B. " + q.B;
       document.getElementById("btnC").textContent = "C. " + q.C;
       document.getElementById("btnD").textContent = "D. " + q.D;
+      statusEl.textContent = "";
 
       enableButtons();
-
-      startTime = Date.now();
-      updateTimer();
+      updateQuestionTimer();
     }
 
-    function updateTimer() {
-      const timerEl = document.getElementById("timer");
+    function updateQuestionTimer() {
       timerEl.textContent = "Time left: " + timeLeft + "s";
+      if (timerInterval) clearInterval(timerInterval);
 
-      timer = setInterval(() => {
+      timerInterval = setInterval(() => {
         timeLeft--;
         timerEl.textContent = "Time left: " + timeLeft + "s";
         if (timeLeft <= 0) {
-          clearInterval(timer);
+          clearInterval(timerInterval);
           answering = false;
           disableButtons();
           sendAnswer("NO_ANSWER");
@@ -167,25 +328,30 @@
 
     function disableButtons() {
       ["btnA", "btnB", "btnC", "btnD"].forEach(id => {
-        document.getElementById(id).disabled = true;
+        const b = document.getElementById(id);
+        if (b) b.disabled = true;
       });
     }
+
     function enableButtons() {
       ["btnA", "btnB", "btnC", "btnD"].forEach(id => {
-        document.getElementById(id).disabled = false;
+        const b = document.getElementById(id);
+        if (b) b.disabled = false;
       });
     }
 
     async function sendAnswer(letter) {
-      if (!answering) return;
+      // allow "NO_ANSWER" even if answering=false (timeout case)
+      if (letter !== "NO_ANSWER" && !answering) return;
+
       answering = false;
-      clearInterval(timer);
       disableButtons();
+      if (timerInterval) clearInterval(timerInterval);
 
-      const elapsed = Date.now() - startTime;
       const q = QUESTIONS[currentIndex];
+      const elapsed = Date.now() - questionStartTime;
 
-      document.getElementById("status").textContent = "Submitting...";
+      statusEl.textContent = "Submitting...";
 
       try {
         await fetch(
@@ -197,9 +363,11 @@
             "&a=" + encodeURIComponent(letter) +
             "&t=" + encodeURIComponent(elapsed)
         );
-      } catch (e) {}
-
-      document.getElementById("status").textContent = "Answer submitted!";
+        statusEl.textContent = "Answer submitted!";
+      } catch (e) {
+        statusEl.textContent =
+          "Answer sent (if anything looks wrong, tell the host).";
+      }
 
       setTimeout(() => {
         currentIndex++;
@@ -212,8 +380,8 @@
     }
 
     async function showFinal() {
-      document.getElementById("questionText").textContent = "Quiz finished!";
-      document.getElementById("timer").textContent = "";
+      questionEl.textContent = "Quiz finished!";
+      timerEl.textContent = "";
       disableButtons();
 
       try {
@@ -229,14 +397,24 @@
         if (data.isWinner && data.code) {
           txt += " | WINNER! Access code: " + data.code;
         }
-        document.getElementById("finalResult").textContent = txt;
+        finalEl.textContent = txt;
       } catch (e) {
-        document.getElementById("finalResult").textContent =
+        finalEl.textContent =
           "Quiz finished. Ask the host for results.";
       }
     }
 
-    loadQuiz();
+    // ---------- INITIALIZATION ----------
+    (function init() {
+      if (!PLAYER_ID) {
+        // show overlay and wait
+        updatePlayerTitle();
+        showUsernameOverlay();
+      } else {
+        updatePlayerTitle();
+        loadQuiz();
+      }
+    })();
   </script>
 </body>
 </html>
