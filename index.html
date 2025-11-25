@@ -66,12 +66,8 @@
 
     const params = new URLSearchParams(window.location.search);
     if (params.get("quiz")) QUIZ_ID = params.get("quiz");
-
-    // Optional bypass via ?player=NAME
     const playerFromUrl = params.get("player");
-    if (playerFromUrl) {
-      PLAYER_ID = playerFromUrl.trim();
-    }
+    if (playerFromUrl) PLAYER_ID = playerFromUrl.trim();
 
     const playerTitleEl = document.getElementById("playerTitle");
     const timerEl = document.getElementById("timer");
