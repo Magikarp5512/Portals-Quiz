@@ -1,1 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Host Panel</title>
+  <style>
+    body { margin:0; font-family:sans-serif; background:#111; color:#fff; padding:20px; }
+    button { padding:10px 16px; font-size:16px; cursor:pointer; border:none; border-radius:6px; background:#2196f3; color:#fff; }
+    #status { margin-top:12px; font-size:14px; }
+  </style>
+</head>
+<body>
+  <h3>Start Quiz</h3>
+  <p>Once every player has entered a username, click below.</p>
+  <button id="startBtn">Start in 15 seconds</button>
+  <div id="status"></div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const QUIZ_ID = params.get("quiz") || "Q1";
+    const BACKEND_URL = "https://script.google.com/macros/s/REPLACE_WITH_YOURS/exec";
+
+    document.getElementById("startBtn").onclick = async () => {
+      document.getElementById("status").textContent = "Starting...";
+      try {
+        const res = await fetch(`${BACKEND_URL}?mode=hostStart&quiz=${encodeURIComponent(QUIZ_ID)}`);
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById("status").textContent =
+            `Quiz ${data.quiz} starts at ${new Date(data.start_at_ms).toLocaleTimeString()}`;
+        } else {
+          document.getElementById("status").textContent = "Error – check script logs.";
+        }
+      } catch (err) {
+        document.getElementById("status").textContent = "Network error.";
+      }
+    };
+  </script>
+</body>
+</html>
 
