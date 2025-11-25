@@ -20,17 +20,10 @@
     const QUIZ_ID = params.get("quiz") || "Q1";
     const BACKEND_URL = "https://script.google.com/macros/s/AKfycbxJoP_wyAcHY4eBYQ0XXZSMFaA80Jeny19W6O6ZjJdf8XRRmNZyjQv0K_MOZcgrMbQdBg/exec";
 
-    document.getElementById("startBtn").onclick = async () => {
-      document.getElementById("status").textContent = "Sending start signal...";
-      try {
-        await fetch(
-          `${BACKEND_URL}?mode=hostStart&quiz=${encodeURIComponent(QUIZ_ID)}`,
-          { method: "GET", mode: "no-cors" }
-        );
-        document.getElementById("status").textContent = "Quiz starting in ~15s!";
-      } catch (err) {
-        document.getElementById("status").textContent = "Could not reach backend. Try again.";
-      }
+    document.getElementById("startBtn").onclick = () => {
+      const url = `${BACKEND_URL}?mode=hostStart&quiz=${encodeURIComponent(QUIZ_ID)}`;
+      window.open(url, "_blank");
+      document.getElementById("status").textContent = "Start signal sent. Close the pop-up when ready.";
     };
   </script>
 </body>
