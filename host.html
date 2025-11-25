@@ -18,24 +18,20 @@
   <script>
     const params = new URLSearchParams(window.location.search);
     const QUIZ_ID = params.get("quiz") || "Q1";
-    const BACKEND_URL = "https://script.google.com/macros/s/REPLACE_WITH_YOURS/exec";
+    const BACKEND_URL = "https://script.google.com/macros/s/AKfycbxJoP_wyAcHY4eBYQ0XXZSMFaA80Jeny19W6O6ZjJdf8XRRmNZyjQv0K_MOZcgrMbQdBg/exec";
 
     document.getElementById("startBtn").onclick = async () => {
-      document.getElementById("status").textContent = "Starting...";
+      document.getElementById("status").textContent = "Sending start signal...";
       try {
-        const res = await fetch(`${BACKEND_URL}?mode=hostStart&quiz=${encodeURIComponent(QUIZ_ID)}`);
-        if (res.ok) {
-          const data = await res.json();
-          document.getElementById("status").textContent =
-            `Quiz ${data.quiz} starts at ${new Date(data.start_at_ms).toLocaleTimeString()}`;
-        } else {
-          document.getElementById("status").textContent = "Error – check script logs.";
-        }
+        await fetch(
+          `${BACKEND_URL}?mode=hostStart&quiz=${encodeURIComponent(QUIZ_ID)}`,
+          { method: "GET", mode: "no-cors" }
+        );
+        document.getElementById("status").textContent = "Quiz starting in ~15s!";
       } catch (err) {
-        document.getElementById("status").textContent = "Network error.";
+        document.getElementById("status").textContent = "Could not reach backend. Try again.";
       }
     };
   </script>
 </body>
 </html>
-
